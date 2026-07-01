@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>8-Bit Platformer Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     /* Reset and centering */
     * {
@@ -13,30 +16,71 @@
     }
     
     body {
-      background: #121214;
+      background: #0f0f12;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       overflow: hidden;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Press Start 2P', 'Courier New', Courier, monospace;
+    }
+
+    .game-container {
+      position: relative;
+      width: min(100vw, calc(100vh * 256 / 240));
+      height: auto;
+      max-height: 100vh;
+      aspect-ratio: 256 / 240;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+      border: 4px solid #28282c;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
     }
 
     /* Keep canvas pixelated and responsive */
     canvas {
-      width: min(100vw, calc(100vh * 256 / 240));
-      height: auto;
-      max-height: 100vh;
-      image-rendering: pixelated;
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
+      image-rendering: pixelated;
       background: #5c94fc;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .crt-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.12) 50%
+      );
+      background-size: 100% 4px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .crt-overlay::after {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: radial-gradient(circle, rgba(0,0,0,0) 65%, rgba(0,0,0,0.55) 100%);
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
 
-  <canvas id="game" width="256" height="240" aria-label="8-bit platformer game"></canvas>
+  <div class="game-container">
+    <canvas id="game" width="256" height="240" aria-label="8-bit platformer game"></canvas>
+    <div class="crt-overlay"></div>
+  </div>
 
   <script src="./src/core/platformer-core.js"></script>
   <script>
@@ -89,6 +133,759 @@
       return Math.max(0, Math.min(max, state.player.x - 96));
     }
 
+    // Palette mappings for 8-bit sprites
+    const PALETTES = {
+      mario: {
+        'R': '#d82800', // Red
+        'S': '#f8d878', // Skin
+        'B': '#203050', // Dark Blue/Brown
+      },
+      charged_mario: {
+        'R': '#ffffff', // White hat/shirt
+        'B': '#d82800', // Red overalls
+        'S': '#f8d878', // Skin
+      },
+      goomba: {
+        'B': '#9c4a00', // Dark Brown
+        'S': '#f8d878', // Skin / Tan face/feet
+        'K': '#000000', // Black details
+        'W': '#ffffff'  // White eyes
+      },
+      mushroom: {
+        'R': '#d82800', // Red cap
+        'S': '#f8d878', // Skin stem
+        'W': '#ffffff', // White spots
+        'K': '#000000'  // Black eyes
+      },
+      flower: {
+        'W': '#ffffff', // White petals
+        'R': '#d82800', // Red center
+        'G': '#00a800', // Green stem/leaves
+        'O': '#f8a400'  // Orange outline
+      },
+      fireball: {
+        'R': '#d82800',
+        'O': '#ffe066'
+      },
+      cloud: {
+        'W': '#ffffff',
+        'B': '#88d8ff'
+      },
+      bush: {
+        'W': '#00a800', // Green
+        'B': '#005000'  // Dark green
+      },
+      tiles: {
+        'M': '#c84c0c', // Main Orange/Brown (Ground/Stair/Brick)
+        'H': '#f8d878', // Highlight Gold (Ground/Stair/Brick)
+        'D': '#783410', // Dark Outline/Shadow (Ground/Stair/Brick)
+        'K': '#000000', // Black Outline
+        'G': '#00a800', // Green (Pipe)
+        'L': '#80e080', // Light Green highlight (Pipe)
+        'S': '#005000', // Dark Green shadow (Pipe)
+        'W': '#ffffff', // White (Flag)
+        'P': '#cccccc', // Gray (Flagpole)
+        'R': '#d82800', // Red (Flag)
+        'U': '#9c6b3c', // Used block main brown
+        'A': '#c88b5c'  // Used block highlight light brown
+      }
+    };
+
+    // Pixel Art Sprite Matrices
+    const SPRITES_SMALL_MARIO = {
+      stand: [
+        "   RRRRR    ",
+        "  RRRRRRRRR ",
+        "  BBBSBS    ",
+        " BSBSSSSSSS ",
+        " BBSSBSSBBBB",
+        "  BBRBBB    ",
+        " BBBRBBRBBB ",
+        "SSBBRRRRBBSS",
+        "SSBRSRRSRBSS",
+        "SSSRRRRRRSSS",
+        "SSRRRRRRRRSS",
+        "  RRR  RRR  ",
+        " BBB    BBB ",
+        "BBBB    BBBB"
+      ],
+      run1: [
+        "    RRRRR   ",
+        "   RRRRRRRRR",
+        "   BBBSBS   ",
+        "  BSBSSSSSSS",
+        "  BBSSBSSBBB",
+        "   BBRBB    ",
+        "  BBBRRRBBB ",
+        " SSBBRRRRBS ",
+        "  SBRSRRSB  ",
+        "   RRRRRR   ",
+        "  RRRRRRRR  ",
+        " RRRR  RRR  ",
+        "BBB     BBB ",
+        "BB       BB "
+      ],
+      run2: [
+        "   RRRRR    ",
+        "  RRRRRRRRR ",
+        "  BBBSBS    ",
+        " BSBSSSSSSS ",
+        " BBSSBSSBBBB",
+        "  BBRBBB    ",
+        " BBBRRBRBBB ",
+        "SSBBRRRRBBSS",
+        " SBRSRRSRBS ",
+        "  RRRRRRRR  ",
+        " RRRRRRRRRR ",
+        " RRR    RRR ",
+        " BBB    BBB ",
+        " BB      BB "
+      ],
+      run3: [
+        "   RRRRR    ",
+        "  RRRRRRRRR ",
+        "  BBBSBS    ",
+        " BSBSSSSSSS ",
+        " BBSSBSSBBBB",
+        "  BBRBBB    ",
+        "  BBRRBRBBB ",
+        "  BBRRRRBBSS",
+        "  BRSRRSRBS ",
+        "   RRRRRR   ",
+        "  RRRRRRRR  ",
+        "  RRR  RRRR ",
+        "  BBB    BBB",
+        "  BB       B"
+      ],
+      jump: [
+        "   RRRRR    ",
+        "  RRRRRRRRR ",
+        "  BBBSBS    ",
+        " BSBSSSSSSS ",
+        " BBSSBSSBBBB",
+        "  BBRBBB    ",
+        "  BBRRBRBBB ",
+        "SSBBRRRRBBSS",
+        "SSBRSRRSRBSS",
+        "  RRRRRRRR  ",
+        " RRRRRRRRRR ",
+        "RRR      RRR",
+        "BBB      BBB",
+        " B        B "
+      ],
+      skid: [
+        "   RRRRR    ",
+        "  RRRRRRRRR ",
+        "  BBBSBS    ",
+        " BSBSSSSSSS ",
+        " BBSSBSSBBBB",
+        "  BBRBBB    ",
+        " BBBRRBRBBB ",
+        "SSBBRRRRBBSS",
+        "SSBRSRRSRBSS",
+        "  RRRRRRRR  ",
+        "  RRRRRRRR  ",
+        "  RRR  RRR  ",
+        "  BBB  BBB  ",
+        "  BB    BB  "
+      ],
+      death: [
+        "  BB BB BB  ",
+        " BBBBBBBBBB ",
+        " BSSBSSBSSB ",
+        " SSSSSSSSSS ",
+        " SSSSSSSSSS ",
+        "  SSSSSSSS  ",
+        "   RRRRRR   ",
+        "  RRRRRRRR  ",
+        " RRRRRRRRRR ",
+        " RRRRRRRRRR ",
+        "  RRRRRRRR  ",
+        "  BBB  BBB  ",
+        " BBB    BBB ",
+        "BBB      BBB"
+      ]
+    };
+
+    const SPRITES_LARGE_MARIO = {
+      stand: [
+        "    RRRRR     ",
+        "   RRRRRRRRR  ",
+        "   BBBSBS     ",
+        "  BSBSSSSSSS  ",
+        "  BSBSSBSBSSS ",
+        "  BBSSBSSBBBB ",
+        "    SSSSSSS   ",
+        "    BBRBBB    ",
+        "   BBBRBBRBBB ",
+        "  BBBBRRRRBBBB",
+        "  SSBBRRRRBBSS",
+        "  SSBRSRRSRBSS",
+        "  SSSRRRRRRSSS",
+        "  SSRRRRRRRRSS",
+        "    RRRRRRRR  ",
+        "   RRRRRRRRRR ",
+        "  RRRRRRRRRRRR",
+        "  RRRR    RRRR",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        "BBBB        BBBB",
+        "BBBB        BBBB"
+      ],
+      run1: [
+        "     RRRRR    ",
+        "    RRRRRRRRR ",
+        "    BBBSBS    ",
+        "   BSBSSSSSSS ",
+        "   BSBSSBSBSSS",
+        "   BBSSBSSBBBB",
+        "     SSSSSSS  ",
+        "     BBRBBB   ",
+        "    BBBRRRBBB ",
+        "   SSBBRRRRBS ",
+        "    SBRSRRSB  ",
+        "     RRRRRR   ",
+        "    RRRRRRRR  ",
+        "   RRRRRRRRRR ",
+        "  RRRRRRRRRRRR",
+        "  RRRR    RRRR",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        "BBBB        BBBB",
+        "BBBB        BBBB",
+        "BBB          BBB",
+        "BB            BB"
+      ],
+      run2: [
+        "    RRRRR     ",
+        "   RRRRRRRRR  ",
+        "   BBBSBS     ",
+        "  BSBSSSSSSS  ",
+        "  BSBSSBSBSSS ",
+        "  BBSSBSSBBBB ",
+        "    SSSSSSS   ",
+        "    BBRBBB    ",
+        "   BBBRRBRBBB ",
+        "  SSBBRRRRBBSS",
+        "   SBRSRRSRBS ",
+        "    RRRRRRRR  ",
+        "   RRRRRRRRRR ",
+        "  RRRRRRRRRRRR",
+        "  RRRR    RRRR",
+        "  RRRR    RRRR",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BB        BB ",
+        " B          B "
+      ],
+      run3: [
+        "    RRRRR     ",
+        "   RRRRRRRRR  ",
+        "   BBBSBS     ",
+        "  BSBSSSSSSS  ",
+        "  BBSSBSSBBBB ",
+        "    BBRBBB    ",
+        "    BBRRBRBBB ",
+        "    BBRRRRBBSS",
+        "    BRSRRSRBS ",
+        "     RRRRRR   ",
+        "    RRRRRRRR  ",
+        "    RRR  RRRR ",
+        "    BBB    BBB",
+        "    BB       B",
+        "    RRRRRRRR  ",
+        "   RRRRRRRRRR ",
+        "  RRRRRRRRRRRR",
+        "  RRRR    RRRR",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        "BBBB        BBBB",
+        "BBBB        BBBB"
+      ],
+      jump: [
+        "    RRRRR     ",
+        "   RRRRRRRRR  ",
+        "   BBBSBS     ",
+        "  BSBSSSSSSS  ",
+        "  BBSSBSSBBBB ",
+        "    BBRBBB    ",
+        "    BBRRBRBBB ",
+        "  SSBBRRRRBBSS",
+        "  SSBRSRRSRBSS",
+        "    RRRRRRRR  ",
+        "   RRRRRRRRRR ",
+        "  RRR      RRR",
+        "  BBB      BBB",
+        "   B        B ",
+        "    RRRRRRRR  ",
+        "   RRRRRRRRRR ",
+        "  RRRRRRRRRRRR",
+        "  RRRR    RRRR",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        "BBBB        BBBB",
+        "BBBB        BBBB"
+      ],
+      skid: [
+        "    RRRRR     ",
+        "   RRRRRRRRR  ",
+        "   BBBSBS     ",
+        "  BSBSSSSSSS  ",
+        "  BBSSBSSBBBB ",
+        "    BBRBBB    ",
+        "    BBRRBRBBB ",
+        "  SSBBRRRRBBSS",
+        "  SSBRSRRSRBSS",
+        "    RRRRRRRR  ",
+        "    RRRRRRRR  ",
+        "    RRR  RRR  ",
+        "    BBB  BBB  ",
+        "    BB    BB  ",
+        "    RRRRRRRR  ",
+        "   RRRRRRRRRR ",
+        "  RRRRRRRRRRRR",
+        "  RRRR    RRRR",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        "  BBB      BBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        " BBBB      BBBB",
+        "BBBB        BBBB",
+        "BBBB        BBBB"
+      ],
+      crouch: [
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "    RRRRR     ",
+        "   RRRRRRRRR  ",
+        "   BBBSBS     ",
+        "  BSBSSSSSSS  ",
+        "  BSBSSBSBSSS ",
+        "  BBSSBSSBBBB ",
+        "    SSSSSSS   ",
+        "    BBRBBB    ",
+        "   BBBRBBRBBB ",
+        "  BBBBRRRRBBBB",
+        "  SSBBRRRRBBSS",
+        "  SSBRSRRSRBSS",
+        "  SSSRRRRRRSSS",
+        "  SSRRRRRRRRSS"
+      ]
+    };
+
+    const SPRITES_GOOMBA = {
+      walk1: [
+        "    BBBBBBBB  ",
+        "  BBBBBBBBBBBB",
+        " BBBBBBBBBBBBB",
+        "BBKKBBBBBBKKBB",
+        "BWWKKBBBBKKWWB",
+        "BWKKKBBBBKKKWB",
+        "BBBBBBBBBBBBBB",
+        "  BSSSSSSSSB  ",
+        "  BSSSSSSSSB  ",
+        "   BSSBSSSB   ",
+        "    B   B     ",
+        "  KKK   KKK   ",
+        " KKKK   KKKK  ",
+        " KKK     KKK  "
+      ],
+      walk2: [
+        "    BBBBBBBB  ",
+        "  BBBBBBBBBBBB",
+        " BBBBBBBBBBBBB",
+        "BBKKBBBBBBKKBB",
+        "BWWKKBBBBKKWWB",
+        "BWKKKBBBBKKKWB",
+        "BBBBBBBBBBBBBB",
+        "  BSSSSSSSSB  ",
+        "  BSSSSSSSSB  ",
+        "   BSSBSSSB   ",
+        "     B   B    ",
+        "   KKK   KKK  ",
+        "  KKKK   KKKK ",
+        "  KKK     KKK "
+      ],
+      flat: [
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "              ",
+        "  BBBBBBBBBB  ",
+        " BBBBBBBBBBBB ",
+        "BKKBBBBBBBBKKB",
+        "BSSKSSBBSKSSB ",
+        " KKKKKKKKKKK  "
+      ]
+    };
+
+    const SPRITE_MUSHROOM = [
+      "    RRRRRR    ",
+      "  RRWWRRWWRR  ",
+      " RRWWRRWWRRWR ",
+      "RRRRRRRRRRRRRR",
+      "RRWWRRWWRRWRRR",
+      "RRWWRRWWRRWRRR",
+      "RRRRRRRRRRRRRR",
+      "  SSKSSKSSSS  ",
+      "  SSKSSKSSSS  ",
+      "  SSSSSSSSSS  ",
+      "  SSSSSSSSSS  ",
+      "   SSSSSSSS   ",
+      "   SSSSSSSS   ",
+      "    SSSSSS    "
+    ];
+
+    const SPRITE_FLOWER = [
+      "    OOOOOO    ",
+      "  OOWWWWWWOO  ",
+      " OOWWRRRRWWOO ",
+      "OOWWRROORRWWOO",
+      "OOWWRROORRWWOO",
+      " OOWWRRRRWWOO ",
+      "  OOWWWWWWOO  ",
+      "    OOGGOO    ",
+      "    GGGGGG    ",
+      "  GGGGGGGGGG  ",
+      "GGGG  GG  GGGG",
+      "GG    GG    GG",
+      "      GG      ",
+      "      GG      "
+    ];
+
+    const SPRITE_FIREBALL = [
+      "  RR  ",
+      " ROOR ",
+      "ROOORR",
+      "ROOORR",
+      " ROOR ",
+      "  RR  "
+    ];
+
+    const SPRITE_CLOUD = [
+      "      WWWWWWWWWW                ",
+      "    WWWWWWWWWWWWWW              ",
+      "   WWWWWWWWWWWWWWWW             ",
+      "  WWWWWWWWWWWWWWWWWW  WWWWWW    ",
+      " WWWWWWWWWWWWWWWWWWWWWWWWWWWW   ",
+      "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW  ",
+      "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW  ",
+      "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW  ",
+      " WWWWWWWWWWWWWWWWWWWWWWWWWWWW   ",
+      "  WWWWWWWWWWWWWWWWWWWWWWWWWW    ",
+      "   WWWWWWWWWWWWWWWWWWWWWWWW     ",
+      "     BBBBBBBBBBBBBBBBBBBB       "
+    ];
+
+    const SPRITES_TILES = {
+      ground: [
+        "HHHHHHHHHHHHHHHK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMKKMMMMMMKKMMK",
+        "HMMKKMMMMMMKKMMK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMMMKKMMMMMMKKK",
+        "HMMMMKKMMMMMMKKK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMKKMMMMMMKKMMK",
+        "HMMKKMMMMMMKKMMK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMMMKKMMMMMMKKK",
+        "HMMMMKKMMMMMMKKK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMMMMMMMMMMMMMK",
+        "KKKKKKKKKKKKKKKK"
+      ],
+      ground_top: [
+        "HHHHHHHHHHHHHHHK",
+        "HHHHHHHHHHHHHHHK",
+        "HHHHKKHHHHHHKKHK",
+        "HHHHKKHHHHHHKKHK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMMMKKMMMMMMKKK",
+        "HMMMMKKMMMMMMKKK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMKKMMMMMMKKMMK",
+        "HMMKKMMMMMMKKMMK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMMMKKMMMMMMKKK",
+        "HMMMMKKMMMMMMKKK",
+        "HMMMMMMMMMMMMMMK",
+        "HMMMMMMMMMMMMMMK",
+        "KKKKKKKKKKKKKKKK"
+      ],
+      brick: [
+        "HHHHHHHKHHHHHHHK",
+        "HMMMMMMKHMMMMMMK",
+        "HDDDDDDKHDDDDDDK",
+        "KKKKKKKKKKKKKKKK",
+        "HHKHHHHHHHKHHHHH",
+        "HMKMMMMMMMKMMMMM",
+        "HDKDDDDDDKDDDDDD",
+        "KKKKKKKKKKKKKKKK",
+        "HHHHHHHKHHHHHHHK",
+        "HMMMMMMKHMMMMMMK",
+        "HDDDDDDKHDDDDDDK",
+        "KKKKKKKKKKKKKKKK",
+        "HHKHHHHHHHKHHHHH",
+        "HMKMMMMMMMKMMMMM",
+        "HDKDDDDDDKDDDDDD",
+        "KKKKKKKKKKKKKKKK"
+      ],
+      question: [
+        "KKKKKKKKKKKKKKKK",
+        "KHHHHHHHHHHHHHOK",
+        "KHBBMMMMMMMMBBOK",
+        "KHBBMMBBBBMMBBOK",
+        "KHMMMBBBBBBBMOOK",
+        "KHMMMBBMMMBBMOOK",
+        "KHMMMMMMMBBMMOOK",
+        "KHMMMMMMBBMMMOOK",
+        "KHMMMMMBBMMMMOOK",
+        "KHMMMMMBBMMMMOOK",
+        "KHMMMMMMMMMMMOOK",
+        "KHMMMMMBBMMMMOOK",
+        "KHBBMMBBBBMMBBOK",
+        "KHBBMMMMMMMBBOK",
+        "KHOOOOOOOOOOOOOK",
+        "KKKKKKKKKKKKKKKK"
+      ],
+      used: [
+        "KKKKKKKKKKKKKKKK",
+        "KAAAAAAAAAAAAAAAAK",
+        "KAADKKKKKKKKDDAK",
+        "KAADKUUUUUUUDDAK",
+        "KAUUUUUUUUUUUUAK",
+        "KAUUUUUUUUUUUUAK",
+        "KAUUUUUUUUUUUUAK",
+        "KAUUUUUUUUUUUUAK",
+        "KAUUUUUUUUUUUUAK",
+        "KAUUUUUUUUUUUUAK",
+        "KAUUUUUUUUUUUUAK",
+        "KAADKUUUUUUUDDAK",
+        "KAADKKKKKKKKDDAK",
+        "KDDDDDDDDDDDDDK",
+        "KKKKKKKKKKKKKKKK",
+        "                "
+      ],
+      pipe_top_left: [
+        "KKKKKKKKKKKKKKKK",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KLLGGGGGGGGGGDDD",
+        "KKKKKKKKKKKKKKKK"
+      ],
+      pipe_top_right: [
+        "KKKKKKKKKKKKKKKK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "LGGGGGGGGGGGDDDK",
+        "KKKKKKKKKKKKKKKK"
+      ],
+      pipe_left: [
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD",
+        "  KLLGGGGGGGDDDD"
+      ],
+      pipe_right: [
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  ",
+        "LGGGGGGGGGDDDK  "
+      ],
+      stair: [
+        "KKKKKKKKKKKKKKKK",
+        "KHHHHHHHHHHHHHDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KHMMMMMMMMMMMMDK",
+        "KDDDDDDDDDDDDDDK",
+        "KKKKKKKKKKKKKKKK",
+        "                "
+      ],
+      flagpole: [
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     "
+      ],
+      flag_top: [
+        "                ",
+        "      KKKK      ",
+        "    KKLLGGKK    ",
+        "   KLLGGGGGGK   ",
+        "  KLGGGGGGGGDK  ",
+        "  KGGGGGGGGGDK  ",
+        "   KGGGGGGGGDK  ",
+        "    KKDDDDDK    ",
+        "      KKKK      ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     ",
+        "      KGWDK     "
+      ],
+      flag: [
+        "KKKKKKKKKKKK",
+        "KRRRRRRRRRRK",
+        "KRRWWWWRRRRK",
+        "KRWWGGWWRRRK",
+        "KRWGGGGWWRRK",
+        "KRWWGGWWRRRK",
+        "KRRWWWWRRRRK",
+        "KKKKKKKKKKKK"
+      ]
+    };
+
+    // Generic drawing helper for pixel art grids
+    function drawPixelArt(ctx, x, y, matrix, palette, facing = 1, scaleX = 1, scaleY = 1) {
+      const height = matrix.length;
+      const width = matrix[0].length;
+      
+      ctx.save();
+      ctx.translate(x, y);
+      if (facing === -1) {
+        ctx.scale(-1, 1);
+        ctx.translate(-width * scaleX, 0);
+      }
+      
+      for (let r = 0; r < height; r++) {
+        const row = matrix[r];
+        for (let c = 0; c < width; c++) {
+          const char = row[c];
+          if (char !== ' ' && char !== '.') {
+            const color = palette[char];
+            if (color) {
+              ctx.fillStyle = color;
+              ctx.fillRect(c * scaleX, r * scaleY, scaleX, scaleY);
+            }
+          }
+        }
+      }
+      ctx.restore();
+    }
+
     function drawBackground(ctx, camX, state) {
       // Sky color
       ctx.fillStyle = '#5c94fc';
@@ -96,13 +893,10 @@
 
       // Parallax Clouds (30% speed)
       const cloudCamX = camX * 0.3;
-      ctx.fillStyle = '#ffffff';
       for (let cx = -100; cx < state.level.width * 16; cx += 160) {
         const x = cx - cloudCamX;
         if (x > -80 && x < canvas.width + 80) {
-          ctx.fillRect(x, 40, 48, 12);
-          ctx.fillRect(x + 8, 32, 32, 8);
-          ctx.fillRect(x + 16, 24, 16, 8);
+          drawPixelArt(ctx, Math.round(x), 30, SPRITE_CLOUD, PALETTES.cloud);
         }
       }
 
@@ -111,19 +905,9 @@
       for (let hx = -50; hx < state.level.width * 16; hx += 240) {
         const x = hx - hillCamX;
         if (x > -100 && x < canvas.width + 100) {
-          ctx.fillStyle = '#007800';
-          ctx.beginPath();
-          ctx.moveTo(x, 208);
-          ctx.lineTo(x + 40, 140);
-          ctx.lineTo(x + 80, 208);
-          ctx.fill();
-
-          ctx.fillStyle = '#00a800';
-          ctx.beginPath();
-          ctx.moveTo(x + 15, 208);
-          ctx.lineTo(x + 40, 155);
-          ctx.lineTo(x + 65, 208);
-          ctx.fill();
+          // Draw a bush sitting on the ground (y = 208).
+          // Bush has 12 rows, so y position should be 208 - 12 = 196.
+          drawPixelArt(ctx, Math.round(x), 196, SPRITE_CLOUD, PALETTES.bush);
         }
       }
     }
@@ -135,132 +919,64 @@
 
       switch (tileId) {
         case TILE.GROUND:
-          ctx.fillStyle = '#c84c0c';
-          ctx.fillRect(x, y, tileSize, tileSize);
-          ctx.fillStyle = '#783410';
-          ctx.fillRect(x + 2, y + 2, 2, 2);
-          ctx.fillRect(x + 10, y + 6, 2, 2);
-          ctx.fillRect(x + 6, y + 12, 2, 2);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.ground, PALETTES.tiles);
           break;
 
         case TILE.GROUND_TOP:
-          ctx.fillStyle = '#f8d878';
-          ctx.fillRect(x, y, tileSize, 4);
-          ctx.fillStyle = '#c84c0c';
-          ctx.fillRect(x, y + 4, tileSize, tileSize - 4);
-          ctx.fillStyle = '#783410';
-          ctx.fillRect(x, y + 3, tileSize, 1);
-          ctx.fillRect(x + 4, y + 8, 2, 2);
-          ctx.fillRect(x + 12, y + 11, 2, 2);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.ground_top, PALETTES.tiles);
           break;
 
         case TILE.BRICK:
-          ctx.fillStyle = '#b85c20';
-          ctx.fillRect(x, y, tileSize, tileSize);
-          ctx.fillStyle = '#783410';
-          ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
-          ctx.fillRect(x, y + 8, tileSize, 1);
-          ctx.fillRect(x + 8, y, 1, 8);
-          ctx.fillRect(x + 4, y + 8, 1, 8);
-          ctx.fillRect(x + 12, y + 8, 1, 8);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.brick, PALETTES.tiles);
           break;
 
         case TILE.QUESTION:
+          // Question block flash animations via color cycle
           const flash = Math.floor(state.frame / 15) % 3;
-          ctx.fillStyle = flash === 0 ? '#ffe699' : (flash === 1 ? '#f8d878' : '#e0be50');
-          ctx.fillRect(x, y, tileSize, tileSize);
-          ctx.fillStyle = '#783410';
-          ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
-          ctx.font = 'bold 11px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('?', x + tileSize / 2, y + tileSize / 2);
-          ctx.fillRect(x + 2, y + 2, 1, 1);
-          ctx.fillRect(x + 13, y + 2, 1, 1);
-          ctx.fillRect(x + 2, y + 13, 1, 1);
-          ctx.fillRect(x + 13, y + 13, 1, 1);
+          const flashPalette = { ...PALETTES.tiles };
+          if (flash === 0) {
+            flashPalette['M'] = '#ffe699';
+            flashPalette['O'] = '#ffe699';
+          } else if (flash === 1) {
+            flashPalette['M'] = '#f8d878';
+            flashPalette['O'] = '#c84c0c';
+          } else {
+            flashPalette['M'] = '#e0be50';
+            flashPalette['O'] = '#783410';
+          }
+          drawPixelArt(ctx, x, y, SPRITES_TILES.question, flashPalette);
           break;
 
         case TILE.USED:
-          ctx.fillStyle = '#9c6b3c';
-          ctx.fillRect(x, y, tileSize, tileSize);
-          ctx.fillStyle = '#783410';
-          ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
-          ctx.fillRect(x + 2, y + 2, 2, 2);
-          ctx.fillRect(x + 12, y + 2, 2, 2);
-          ctx.fillRect(x + 2, y + 12, 2, 2);
-          ctx.fillRect(x + 12, y + 12, 2, 2);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.used, PALETTES.tiles);
           break;
 
         case TILE.PIPE_TOP_LEFT:
-          ctx.fillStyle = '#00a800';
-          ctx.fillRect(x, y, tileSize, tileSize);
-          ctx.fillStyle = '#007800';
-          ctx.fillRect(x + 10, y, 6, tileSize);
-          ctx.fillStyle = '#80e080';
-          ctx.fillRect(x + 1, y, 2, tileSize);
-          ctx.fillStyle = '#003000';
-          ctx.fillRect(x, y + tileSize - 1, tileSize, 1);
-          ctx.fillRect(x, y, tileSize, 1);
-          ctx.fillRect(x, y, 1, tileSize);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.pipe_top_left, PALETTES.tiles);
           break;
 
         case TILE.PIPE_TOP_RIGHT:
-          ctx.fillStyle = '#00a800';
-          ctx.fillRect(x, y, tileSize, tileSize);
-          ctx.fillStyle = '#007800';
-          ctx.fillRect(x + 6, y, 10, tileSize);
-          ctx.fillStyle = '#003000';
-          ctx.fillRect(x, y + tileSize - 1, tileSize, 1);
-          ctx.fillRect(x, y, tileSize, 1);
-          ctx.fillRect(x + tileSize - 1, y, 1, tileSize);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.pipe_top_right, PALETTES.tiles);
           break;
 
         case TILE.PIPE_LEFT:
-          ctx.fillStyle = '#00a800';
-          ctx.fillRect(x + 2, y, tileSize - 2, tileSize);
-          ctx.fillStyle = '#007800';
-          ctx.fillRect(x + 10, y, 6, tileSize);
-          ctx.fillStyle = '#80e080';
-          ctx.fillRect(x + 3, y, 2, tileSize);
-          ctx.fillStyle = '#003000';
-          ctx.fillRect(x + 2, y, 1, tileSize);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.pipe_left, PALETTES.tiles);
           break;
 
         case TILE.PIPE_RIGHT:
-          ctx.fillStyle = '#00a800';
-          ctx.fillRect(x, y, tileSize - 2, tileSize);
-          ctx.fillStyle = '#007800';
-          ctx.fillRect(x + 6, y, 8, tileSize);
-          ctx.fillStyle = '#003000';
-          ctx.fillRect(x + tileSize - 3, y, 1, tileSize);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.pipe_right, PALETTES.tiles);
           break;
 
         case TILE.STAIR:
-          ctx.fillStyle = '#b85c20';
-          ctx.fillRect(x, y, tileSize, tileSize);
-          ctx.fillStyle = '#783410';
-          ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
-          ctx.fillStyle = '#f8d878';
-          ctx.fillRect(x + 1, y + 1, tileSize - 2, 1);
-          ctx.fillRect(x + 1, y + 1, 1, tileSize - 2);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.stair, PALETTES.tiles);
           break;
 
         case TILE.FLAGPOLE:
-          ctx.fillStyle = '#cccccc';
-          ctx.fillRect(x + 6, y, 4, tileSize);
-          ctx.fillStyle = '#783410';
-          ctx.fillRect(x + 5, y, 1, tileSize);
-          ctx.fillRect(x + 10, y, 1, tileSize);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.flagpole, PALETTES.tiles);
           break;
 
         case TILE.FLAG_TOP:
-          ctx.fillStyle = '#007800';
-          ctx.fillRect(x + 4, y + 4, 8, 8);
-          ctx.fillStyle = '#00a800';
-          ctx.fillRect(x + 5, y + 5, 4, 4);
-          ctx.fillStyle = '#cccccc';
-          ctx.fillRect(x + 6, y + 12, 4, 4);
+          drawPixelArt(ctx, x, y, SPRITES_TILES.flag_top, PALETTES.tiles);
           break;
       }
     }
@@ -270,156 +986,75 @@
         return; // Flash invulnerability
       }
 
-      ctx.save();
-      ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
-      ctx.scale(player.facing, 1);
-
       const form = player.form;
-      const accentColor = (form === FORMS.CHARGED) ? '#ffe066' : '#d82800';
-      const clothingColor = '#203050';
-      const skinColor = '#f8d878';
+      const isMoving = Math.abs(player.vx) > 5;
+      const isGrounded = player.grounded;
+      const isSkidding = (player.vx > 10 && player.facing === -1) || (player.vx < -10 && player.facing === 1);
 
-      if (form === FORMS.SMALL) {
-        // Head
-        ctx.fillStyle = accentColor;
-        ctx.fillRect(-4, -7, 8, 2);
-        ctx.fillRect(-2, -8, 5, 1);
-
-        ctx.fillStyle = skinColor;
-        ctx.fillRect(-3, -5, 7, 4);
-        
-        ctx.fillStyle = clothingColor;
-        ctx.fillRect(1, -5, 2, 2);
-
-        // Torso
-        ctx.fillStyle = clothingColor;
-        ctx.fillRect(-4, -1, 8, 5);
-        ctx.fillStyle = accentColor;
-        ctx.fillRect(-5, -1, 1, 3);
-        ctx.fillRect(4, -1, 1, 3);
-
-        // Legs / Feet
-        const isMoving = Math.abs(player.vx) > 5;
-        const isGrounded = player.grounded;
-        const walkCycle = Math.floor(state.frame / 5) % 2;
-
-        if (isGrounded && isMoving && walkCycle === 1) {
-          ctx.fillStyle = clothingColor;
-          ctx.fillRect(-3, 4, 2, 3);
-          ctx.fillRect(2, 4, 2, 2);
-        } else {
-          ctx.fillStyle = clothingColor;
-          ctx.fillRect(-4, 4, 3, 3);
-          ctx.fillRect(1, 4, 3, 3);
-        }
-      } else {
-        // Large or Charged
-        // Head
-        ctx.fillStyle = accentColor;
-        ctx.fillRect(-5, -14, 10, 3);
-        ctx.fillRect(-3, -15, 7, 1);
-        
-        ctx.fillStyle = skinColor;
-        ctx.fillRect(-4, -11, 8, 7);
-        ctx.fillStyle = clothingColor;
-        ctx.fillRect(1, -11, 2, 3);
-
-        // Body
-        ctx.fillStyle = accentColor;
-        ctx.fillRect(-5, -4, 10, 4);
-
-        ctx.fillStyle = clothingColor;
-        ctx.fillRect(-6, 0, 12, 10);
-        ctx.fillStyle = accentColor;
-        ctx.fillRect(-7, 0, 1, 6);
-        ctx.fillRect(6, 0, 1, 6);
-
-        // Legs
-        const isMoving = Math.abs(player.vx) > 5;
-        const isGrounded = player.grounded;
-        const walkCycle = Math.floor(state.frame / 4) % 4;
-
-        if (isGrounded && isMoving) {
-          if (walkCycle === 0 || walkCycle === 2) {
-            ctx.fillStyle = clothingColor;
-            ctx.fillRect(-6, 10, 5, 4);
-            ctx.fillRect(1, 10, 5, 4);
-          } else if (walkCycle === 1) {
-            ctx.fillStyle = clothingColor;
-            ctx.fillRect(-5, 10, 4, 3);
-            ctx.fillRect(2, 10, 4, 4);
-          } else {
-            ctx.fillStyle = clothingColor;
-            ctx.fillRect(-6, 10, 4, 4);
-            ctx.fillRect(1, 10, 4, 3);
-          }
-        } else if (!isGrounded) {
-          ctx.fillStyle = clothingColor;
-          ctx.fillRect(-6, 10, 4, 2);
-          ctx.fillRect(1, 10, 5, 4);
-        } else {
-          ctx.fillStyle = clothingColor;
-          ctx.fillRect(-6, 10, 5, 4);
-          ctx.fillRect(1, 10, 5, 4);
-        }
+      let palette = PALETTES.mario;
+      if (form === FORMS.CHARGED) {
+        palette = PALETTES.charged_mario;
       }
 
-      ctx.restore();
+      const px = Math.round(player.x);
+      const py = Math.round(player.y);
+
+      if (form === FORMS.SMALL) {
+        let sprite = SPRITES_SMALL_MARIO.stand;
+        if (state.mode === MODES.DYING || state.mode === MODES.GAME_OVER) {
+          sprite = SPRITES_SMALL_MARIO.death;
+        } else if (!isGrounded) {
+          sprite = SPRITES_SMALL_MARIO.jump;
+        } else if (isSkidding) {
+          sprite = SPRITES_SMALL_MARIO.skid;
+        } else if (isMoving) {
+          const walkCycle = Math.floor(state.frame / 5) % 2;
+          sprite = walkCycle === 1 ? SPRITES_SMALL_MARIO.run1 : SPRITES_SMALL_MARIO.run2;
+        }
+        drawPixelArt(ctx, px, py, sprite, palette, player.facing);
+      } else {
+        let sprite = SPRITES_LARGE_MARIO.stand;
+        if (!isGrounded) {
+          sprite = SPRITES_LARGE_MARIO.jump;
+        } else if (isSkidding) {
+          sprite = SPRITES_LARGE_MARIO.skid;
+        } else if (isMoving) {
+          const walkCycle = Math.floor(state.frame / 4) % 4;
+          if (walkCycle === 0) sprite = SPRITES_LARGE_MARIO.run1;
+          else if (walkCycle === 1 || walkCycle === 3) sprite = SPRITES_LARGE_MARIO.run2;
+          else sprite = SPRITES_LARGE_MARIO.run3;
+        }
+        drawPixelArt(ctx, px, py, sprite, palette, player.facing);
+      }
     }
 
     function drawEntities(ctx, state) {
       // Draw enemies
       for (const enemy of state.entities.enemies) {
+        const ex = Math.round(enemy.x);
+        const ey = Math.round(enemy.y);
+
         if (!enemy.alive) {
-          ctx.fillStyle = '#6b3a1f';
-          ctx.fillRect(enemy.x, enemy.y + 10, 14, 4);
-          ctx.fillStyle = '#f8d878';
-          ctx.fillRect(enemy.x + 2, enemy.y + 11, 10, 2);
+          drawPixelArt(ctx, ex, ey, SPRITES_GOOMBA.flat, PALETTES.goomba);
           continue;
         }
 
         const walkCycle = Math.floor(enemy.animationTime * 8) % 2;
-        ctx.fillStyle = '#6b3a1f';
-        ctx.fillRect(enemy.x + 1, enemy.y + 1, 12, 10);
-        ctx.fillStyle = '#f8d878';
-        ctx.fillRect(enemy.x + 3, enemy.y + 4, 8, 4);
-        ctx.fillStyle = '#203050';
-        ctx.fillRect(enemy.x + 4, enemy.y + 5, 2, 2);
-        ctx.fillRect(enemy.x + 8, enemy.y + 5, 2, 2);
-        
-        ctx.fillStyle = '#6b3a1f';
-        if (walkCycle === 0) {
-          ctx.fillRect(enemy.x + 1, enemy.y + 11, 4, 3);
-          ctx.fillRect(enemy.x + 9, enemy.y + 11, 4, 2);
-        } else {
-          ctx.fillRect(enemy.x + 1, enemy.y + 11, 4, 2);
-          ctx.fillRect(enemy.x + 9, enemy.y + 11, 4, 3);
-        }
+        const sprite = walkCycle === 0 ? SPRITES_GOOMBA.walk1 : SPRITES_GOOMBA.walk2;
+        drawPixelArt(ctx, ex, ey, sprite, PALETTES.goomba, enemy.direction);
       }
 
       // Draw powerups
       for (const powerup of state.entities.powerups) {
         if (!powerup.active) continue;
 
+        const px = Math.round(powerup.x);
+        const py = Math.round(powerup.y);
+
         if (powerup.kind === 'growth') {
-          ctx.fillStyle = '#00a800';
-          ctx.fillRect(powerup.x + 6, powerup.y + 4, 2, 9);
-          ctx.fillRect(powerup.x + 2, powerup.y + 5, 4, 3);
-          ctx.fillRect(powerup.x + 8, powerup.y + 7, 4, 3);
-          ctx.fillStyle = '#80e080';
-          ctx.fillRect(powerup.x + 3, powerup.y + 4, 2, 1);
-          ctx.fillRect(powerup.x + 9, powerup.y + 6, 2, 1);
+          drawPixelArt(ctx, px, py, SPRITE_MUSHROOM, PALETTES.mushroom);
         } else if (powerup.kind === 'charged') {
-          ctx.fillStyle = '#ffe066';
-          ctx.beginPath();
-          ctx.moveTo(powerup.x + 9, powerup.y + 1);
-          ctx.lineTo(powerup.x + 3, powerup.y + 7);
-          ctx.lineTo(powerup.x + 7, powerup.y + 7);
-          ctx.lineTo(powerup.x + 5, powerup.y + 13);
-          ctx.lineTo(powerup.x + 11, powerup.y + 6);
-          ctx.lineTo(powerup.x + 7, powerup.y + 6);
-          ctx.closePath();
-          ctx.fill();
+          drawPixelArt(ctx, px, py, SPRITE_FLOWER, PALETTES.flower);
         }
       }
 
@@ -427,19 +1062,17 @@
       for (const proj of state.entities.projectiles) {
         if (!proj.active) continue;
 
-        ctx.fillStyle = '#ffe066';
-        ctx.fillRect(proj.x, proj.y, proj.width, proj.height);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(proj.x + 1.5, proj.y + 1.5, 3, 3);
+        const px = Math.round(proj.x);
+        const py = Math.round(proj.y);
+        drawPixelArt(ctx, px, py, SPRITE_FIREBALL, PALETTES.fireball);
       }
 
       // Draw flag object
       const flagObj = state.level.objects.find(obj => obj.type === 'flag');
       if (flagObj) {
-        ctx.fillStyle = '#d82800';
-        ctx.fillRect(flagObj.x - 12, flagObj.y + 12, 12, 8);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(flagObj.x - 8, flagObj.y + 14, 4, 4);
+        const fx = Math.round(flagObj.x);
+        const fy = Math.round(flagObj.y);
+        drawPixelArt(ctx, fx - 12, fy + 12, SPRITES_TILES.flag, PALETTES.tiles);
       }
     }
 
@@ -630,21 +1263,24 @@
         ctx.save();
         ctx.globalAlpha = alpha;
         
+        const rx = Math.round(fx.x);
+        const ry = Math.round(fx.y);
+
         if (fx.type === 'text') {
           ctx.font = 'bold 8px monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = 2;
-          ctx.strokeText(fx.text, fx.x, fx.y);
+          ctx.strokeText(fx.text, rx, ry);
           ctx.fillStyle = fx.color;
-          ctx.fillText(fx.text, fx.x, fx.y);
+          ctx.fillText(fx.text, rx, ry);
         } else if (fx.type === 'sparkle') {
           ctx.fillStyle = fx.color;
-          ctx.fillRect(fx.x - 1, fx.y - 1, 2, 2);
+          ctx.fillRect(rx - 1, ry - 1, 2, 2);
         } else if (fx.type === 'debris') {
           ctx.fillStyle = fx.color;
-          ctx.fillRect(fx.x - 2, fx.y - 2, 4, 4);
+          ctx.fillRect(rx - 2, ry - 2, 4, 4);
         }
         
         ctx.restore();
@@ -722,7 +1358,7 @@
     }
 
     function render(state) {
-      const camX = cameraX(state);
+      const camX = Math.round(cameraX(state));
       
       // Clear canvas with background
       drawBackground(ctx, camX, state);
