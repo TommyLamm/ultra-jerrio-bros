@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status update:** This original full handoff plan has been split. Core/backend gameplay code is now owned in this repo under `src/core/engine.js`. Frontend visual implementation should follow `docs/superpowers/plans/2026-07-01-platformer-visual-agent-plan.md` instead of reimplementing the core.
+
 **Goal:** Build a browser-playable, single-file 8-bit side-scrolling platformer that evokes a classic first-stage platform game while using original art, characters, level layout, and audio.
 
 **Architecture:** Implement one self-contained `index.html` with Canvas rendering, fixed-step game logic, tile-based collision, entity updates, a generated original pixel-art visual layer, and a lightweight test hook exposed as `window.__gameTest`. Keep player-facing runtime dependency-free; optional Playwright smoke tests may live outside the shipped HTML for verification.
