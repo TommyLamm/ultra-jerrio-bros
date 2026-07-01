@@ -1108,21 +1108,29 @@
     }
 
     function drawHUD(ctx, state) {
-      ctx.font = 'bold 8px monospace';
+      ctx.font = '8px "Press Start 2P"';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
 
-      const scoreText = 'SCORE ' + String(state.score).padStart(6, '0');
-      const coinsText = 'COINS ' + String(state.coins).padStart(2, '0');
-      const worldText = 'WORLD 1-1';
-      const timeText = 'TIME ' + String(Math.ceil(state.timeRemaining)).padStart(3, '0');
-      const livesText = 'LIVES ' + String(state.lives);
+      // Labels (Row 1)
+      fillTextWithOutline(ctx, 'MARIO', 4, 6);
+      fillTextWithOutline(ctx, 'COINS', 64, 6);
+      fillTextWithOutline(ctx, 'WORLD', 120, 6);
+      fillTextWithOutline(ctx, 'LIVES', 172, 6);
+      fillTextWithOutline(ctx, 'TIME', 220, 6);
 
-      fillTextWithOutline(ctx, scoreText, 4, 6);
-      fillTextWithOutline(ctx, coinsText, 66, 6);
-      fillTextWithOutline(ctx, worldText, 114, 6);
-      fillTextWithOutline(ctx, timeText, 168, 6);
-      fillTextWithOutline(ctx, livesText, 214, 6);
+      // Values (Row 2)
+      const scoreText = String(state.score).padStart(6, '0');
+      const coinsText = 'x' + String(state.coins).padStart(2, '0');
+      const worldText = '1-1';
+      const livesText = 'x' + String(state.lives);
+      const timeText = String(Math.ceil(state.timeRemaining)).padStart(3, '0');
+
+      fillTextWithOutline(ctx, scoreText, 4, 16);
+      fillTextWithOutline(ctx, coinsText, 72, 16);
+      fillTextWithOutline(ctx, worldText, 128, 16);
+      fillTextWithOutline(ctx, livesText, 184, 16);
+      fillTextWithOutline(ctx, timeText, 224, 16);
     }
 
     function drawOverlays(ctx, state) {
@@ -1130,51 +1138,51 @@
 
       // Darken background
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
       if (state.mode === MODES.TITLE) {
         // Large title
-        ctx.font = 'bold 18px monospace';
-        fillTextWithOutline(ctx, 'ULTRA JERRIO', canvas.width / 2, 70, '#000000', '#f8d878');
+        ctx.font = '16px "Press Start 2P"';
+        fillTextWithOutline(ctx, 'ULTRA JERRIO', LOGICAL_WIDTH / 2, 70, '#000000', '#f8d878');
 
         // Flashing instructions
         const flash = Math.floor(state.frame / 20) % 2 === 0;
         if (flash) {
-          ctx.font = 'bold 10px monospace';
-          fillTextWithOutline(ctx, 'PRESS ENTER TO START', canvas.width / 2, 110, '#000000', '#ffffff');
+          ctx.font = '8px "Press Start 2P"';
+          fillTextWithOutline(ctx, 'PRESS ENTER TO START', LOGICAL_WIDTH / 2, 110, '#000000', '#ffffff');
         }
 
         // Instructions (only on title overlay)
-        ctx.font = '8px monospace';
-        fillTextWithOutline(ctx, 'MOVE: A/D or LEFT/RIGHT ARROWS', canvas.width / 2, 150, '#000000', '#cccccc');
-        fillTextWithOutline(ctx, 'JUMP: Z or SPACEBAR', canvas.width / 2, 165, '#000000', '#cccccc');
-        fillTextWithOutline(ctx, 'RUN/FIRE: X or SHIFT KEY', canvas.width / 2, 180, '#000000', '#cccccc');
+        ctx.font = '8px "Press Start 2P"';
+        fillTextWithOutline(ctx, 'MOVE: A/D or LEFT/RIGHT ARROWS', LOGICAL_WIDTH / 2, 150, '#000000', '#cccccc');
+        fillTextWithOutline(ctx, 'JUMP: Z or SPACEBAR', LOGICAL_WIDTH / 2, 165, '#000000', '#cccccc');
+        fillTextWithOutline(ctx, 'RUN/FIRE: X or SHIFT KEY', LOGICAL_WIDTH / 2, 180, '#000000', '#cccccc');
       } else if (state.mode === MODES.LEVEL_CLEAR) {
-        ctx.font = 'bold 16px monospace';
-        fillTextWithOutline(ctx, 'STAGE CLEAR!', canvas.width / 2, 90, '#000000', '#80e080');
+        ctx.font = '14px "Press Start 2P"';
+        fillTextWithOutline(ctx, 'STAGE CLEAR!', LOGICAL_WIDTH / 2, 90, '#000000', '#80e080');
 
-        ctx.font = 'bold 10px monospace';
-        fillTextWithOutline(ctx, 'TIME BONUS ADDED!', canvas.width / 2, 125, '#000000', '#ffe066');
+        ctx.font = '8px "Press Start 2P"';
+        fillTextWithOutline(ctx, 'TIME BONUS ADDED!', LOGICAL_WIDTH / 2, 125, '#000000', '#ffe066');
         
         const flash = Math.floor(state.frame / 20) % 2 === 0;
         if (flash) {
-          ctx.font = '9px monospace';
-          fillTextWithOutline(ctx, 'PRESS ENTER TO PLAY AGAIN', canvas.width / 2, 160, '#000000', '#ffffff');
+          ctx.font = '8px "Press Start 2P"';
+          fillTextWithOutline(ctx, 'PRESS ENTER TO PLAY AGAIN', LOGICAL_WIDTH / 2, 160, '#000000', '#ffffff');
         }
       } else if (state.mode === MODES.GAME_OVER) {
-        ctx.font = 'bold 18px monospace';
-        fillTextWithOutline(ctx, 'GAME OVER', canvas.width / 2, 90, '#000000', '#d82800');
+        ctx.font = '16px "Press Start 2P"';
+        fillTextWithOutline(ctx, 'GAME OVER', LOGICAL_WIDTH / 2, 90, '#000000', '#d82800');
 
-        ctx.font = '10px monospace';
-        fillTextWithOutline(ctx, 'FINAL SCORE: ' + String(state.score).padStart(6, '0'), canvas.width / 2, 125, '#000000', '#ffffff');
+        ctx.font = '8px "Press Start 2P"';
+        fillTextWithOutline(ctx, 'FINAL SCORE: ' + String(state.score).padStart(6, '0'), LOGICAL_WIDTH / 2, 125, '#000000', '#ffffff');
 
         const flash = Math.floor(state.frame / 20) % 2 === 0;
         if (flash) {
-          ctx.font = '9px monospace';
-          fillTextWithOutline(ctx, 'PRESS ENTER TO RESTART', canvas.width / 2, 160, '#000000', '#ffffff');
+          ctx.font = '8px "Press Start 2P"';
+          fillTextWithOutline(ctx, 'PRESS ENTER TO RESTART', LOGICAL_WIDTH / 2, 160, '#000000', '#ffffff');
         }
       }
     }
@@ -1288,7 +1296,7 @@
         const ry = Math.round(fx.y);
 
         if (fx.type === 'text') {
-          ctx.font = 'bold 8px monospace';
+          ctx.font = '8px "Press Start 2P"';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.strokeStyle = '#000000';
