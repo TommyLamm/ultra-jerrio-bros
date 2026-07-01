@@ -38,8 +38,9 @@
 
   <canvas id="game" width="256" height="240" aria-label="8-bit platformer game"></canvas>
 
-  <script type="module">
-    import { MODES, TILE, FORMS, createGame } from './src/core/engine.js';
+  <script src="./src/core/platformer-core.js"></script>
+  <script>
+    const { MODES, TILE, FORMS, createGame } = globalThis.PlatformerCore;
 
     const canvas = document.querySelector('#game');
     const ctx = canvas.getContext('2d');
