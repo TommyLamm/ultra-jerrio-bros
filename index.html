@@ -88,7 +88,28 @@
 
     const canvas = document.querySelector('#game');
     const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
+
+    const LOGICAL_WIDTH = 256;
+    const LOGICAL_HEIGHT = 240;
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      const scaleX = canvas.width / LOGICAL_WIDTH;
+      const scaleY = canvas.height / LOGICAL_HEIGHT;
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(scaleX, scaleY);
+
+      ctx.imageSmoothingEnabled = false;
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
     const game = createGame();
     let latestState = game.snapshot();
@@ -129,7 +150,7 @@
     }
 
     function cameraX(state) {
-      const max = state.level.width * state.level.tileSize - canvas.width;
+      const max = state.level.width * state.level.tileSize - LOGICAL_WIDTH;
       return Math.max(0, Math.min(max, state.player.x - 96));
     }
 
@@ -889,13 +910,13 @@
     function drawBackground(ctx, camX, state) {
       // Sky color
       ctx.fillStyle = '#5c94fc';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
       // Parallax Clouds (30% speed)
       const cloudCamX = camX * 0.3;
       for (let cx = -100; cx < state.level.width * 16; cx += 160) {
         const x = cx - cloudCamX;
-        if (x > -80 && x < canvas.width + 80) {
+        if (x > -80 && x < LOGICAL_WIDTH + 80) {
           drawPixelArt(ctx, Math.round(x), 30, SPRITE_CLOUD, PALETTES.cloud);
         }
       }
@@ -904,7 +925,7 @@
       const hillCamX = camX * 0.5;
       for (let hx = -50; hx < state.level.width * 16; hx += 240) {
         const x = hx - hillCamX;
-        if (x > -100 && x < canvas.width + 100) {
+        if (x > -100 && x < LOGICAL_WIDTH + 100) {
           // Draw a bush sitting on the ground (y = 208).
           // Bush has 12 rows, so y position should be 208 - 12 = 196.
           drawPixelArt(ctx, Math.round(x), 196, SPRITE_CLOUD, PALETTES.bush);
@@ -1369,7 +1390,7 @@
       // Render visible level tiles only
       const tileSize = state.level.tileSize;
       const minTx = Math.max(0, Math.floor(camX / tileSize));
-      const maxTx = Math.min(state.level.width - 1, Math.ceil((camX + canvas.width) / tileSize));
+      const maxTx = Math.min(state.level.width - 1, Math.ceil((camX + LOGICAL_WIDTH) / tileSize));
 
       for (let ty = 0; ty < state.level.height; ty++) {
         for (let tx = minTx; tx <= maxTx; tx++) {
@@ -1399,7 +1420,7 @@
       // Full screen hurt/death flash
       if (hurtFlashTimer > 0) {
         ctx.fillStyle = `rgba(216, 40, 0, ${hurtFlashTimer * 0.8})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
       }
 
       // Render state overlays
